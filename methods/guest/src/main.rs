@@ -1,0 +1,73 @@
+#![no_main]
+// If you want to try std support, also update the guest Cargo.toml file
+// #![no_std]  // std support is experimental
+
+use risc0_zkvm::guest::env;
+
+risc0_zkvm::guest::entry!(main);
+use tiny_keccak::{Hasher, Keccak};
+use trie_core::Inputs;
+
+fn keccak256_tiny(bytes: &[u8]) -> [u8; 32] {
+    let mut digest = [0u8; 32];
+    let mut hasher = Keccak::v256();
+    hasher.update(bytes);
+    hasher.finalize(&mut digest);
+    digest
+}
+
+pub const fn length_of_length(payload_length: usize) -> usize {
+    if payload_length < 56 {
+        1
+    } else {
+        4 - payload_length.leading_zeros() as usize / 8
+    }
+}
+
+fn compute_root(trie: &Vec<Vec<usize>>, idx: usize) -> Option<[u8; 32]> {
+    if idx >= trie.len() {
+        return None;
+    }
+
+    let node = &trie[idx];
+    return if node.len() == 16 {
+        let non_empty_children = node.iter().filter(|e| **e != 0).count();
+        let payload_size = non_empty_children * 33 + 17 - non_empty_children;
+        let payload_len_len = length_of_length(payload_size);
+
+        let payload_len_bytes = payload_size.to_be_bytes();
+        let payload_len_bytes = &payload_len_bytes[payload_len_bytes.len() - payload_len_len..];
+
+        let mut vec = vec![0xf7 + payload_len_len as u8];
+        vec.extend_from_slice(payload_len_bytes);
+
+        for i in 0..16 {
+            let child_idx = node[i];
+            if child_idx == 0 {
+                vec.push(0x80);
+                continue;
+            }
+
+            let child_hash = compute_root(trie, child_idx);
+            if let Some(data) = child_hash {
+                vec.push(160);
+                vec.extend_from_slice(&data);
+            }
+        }
+
+        vec.push(128); // Empty data
+        let hash = keccak256_tiny(&vec);
+        Some(hash.try_into().unwrap())
+    } else {
+        // let buf = node.iter().cloned().map(|e| e as u8).collect::<Vec<u8>>();
+        let buf: Vec<u8> = node.iter().cloned().map(|e| e as u8).collect();
+        let hash = keccak256_tiny(&buf);
+        Some(hash.try_into().unwrap())
+    };
+}
+
+pub fn main() {
+    let inputs: Inputs = env::read();
+    let root = compute_root(&inputs.trie.trie, 0).unwrap();
+    env::commit(&root);
+}
