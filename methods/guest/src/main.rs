@@ -8,12 +8,9 @@ risc0_zkvm::guest::entry!(main);
 use tiny_keccak::{Hasher, Keccak};
 use trie_core::{Inputs, Node};
 
-fn keccak256_tiny(bytes: &[u8]) -> [u8; 32] {
-    let mut digest = [0u8; 32];
-    let mut hasher = Keccak::v256();
+fn keccak256_tiny(mut hasher: Keccak, bytes: &[u8], output: &mut [u8; 32]) {
     hasher.update(bytes);
-    hasher.finalize(&mut digest);
-    digest
+    hasher.finalize(output);
 }
 
 pub const fn length_of_length(payload_length: usize) -> usize {
@@ -66,7 +63,7 @@ pub const fn length_of_length(payload_length: usize) -> usize {
 //     };
 // }
 
-fn compute_hash(node: &Node) -> [u8; 32] {
+fn compute_hash(node: &Node, hasher: Keccak, output: &mut [u8; 32]) {
     match node {
         Node::Branch {
             children,
@@ -94,18 +91,17 @@ fn compute_hash(node: &Node) -> [u8; 32] {
                         vec.push(128);
                     }
                     _ => {
-                        let child_hash = compute_hash(child);
+                        compute_hash(child, hasher.clone(), output);
                         vec.push(160);
-                        vec.extend_from_slice(&child_hash);
+                        vec.extend_from_slice(output);
                     }
                 }
             }
 
             vec.push(128); // Empty data
-
-            keccak256_tiny(&vec)
+            keccak256_tiny(hasher, &vec, output);
         }
-        Node::Leaf(leaf) => keccak256_tiny(&leaf),
+        Node::Leaf(leaf) => keccak256_tiny(hasher, &leaf, output),
         Node::Empty => {
             panic!("unexpected empty node");
         }
@@ -114,6 +110,8 @@ fn compute_hash(node: &Node) -> [u8; 32] {
 
 pub fn main() {
     let inputs: Inputs = env::read();
-    let root = compute_hash(&inputs.root);
-    env::commit(&root);
+    let mut output = [0u8; 32];
+    let hasher = Keccak::v256();
+    compute_hash(&inputs.root, hasher, &mut output);
+    env::commit(&output);
 }
