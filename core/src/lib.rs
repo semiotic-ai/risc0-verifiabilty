@@ -8,12 +8,16 @@ pub struct EncodedTrie {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Inputs {
-    pub trie: EncodedTrie,
+    pub root: Node,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, Default)]
 pub enum Node {
-    Branch([Box<Node>; 16]),
+    Branch {
+        children_count: u8,
+        children: [Box<Node>; 16],
+    },
     Leaf(Vec<u8>),
+    #[default]
     Empty,
 }
