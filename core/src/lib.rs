@@ -10,10 +10,3 @@ pub struct EncodedTrie {
 pub struct Inputs {
     pub trie: EncodedTrie,
 }
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub enum Node {
-    Branch([Box<Node>; 16]),
-    Leaf(Vec<u8>),
-    Empty,
-}
