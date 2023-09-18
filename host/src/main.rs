@@ -8,8 +8,6 @@ use hasher::HasherKeccak;
 
 use reth_primitives::{Receipt, ReceiptWithBloomRef};
 use risc0_zkvm::serde::to_vec;
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use cita_trie::MemoryDB;
@@ -17,13 +15,13 @@ use cita_trie::{PatriciaTrie, Trie};
 use reth_primitives::bytes::BytesMut;
 use reth_primitives::rpc_utils::rlp::RlpStream;
 use reth_rlp::Encodable;
-use trie_core::{EncodedTrie, Inputs, Node};
+use trie_core::{Inputs, Node};
 
 pub fn build_from_receipts(receipts: Vec<Receipt>) -> Node {
-    let memdb = Arc::new(MemoryDB::new(true));
+    let mem_db = Arc::new(MemoryDB::new(true));
     let hasher = Arc::new(HasherKeccak::new());
 
-    let mut trie = PatriciaTrie::new(memdb.clone(), hasher.clone());
+    let mut trie = PatriciaTrie::new(mem_db.clone(), hasher.clone());
     let mut key_buf = BytesMut::new();
     let mut value_buf = BytesMut::new();
 
@@ -37,17 +35,7 @@ pub fn build_from_receipts(receipts: Vec<Receipt>) -> Node {
         trie.insert(key_buf.to_vec(), value_buf.to_vec()).unwrap();
     }
 
-    // let trie_vec = Rc::new(RefCell::new(Vec::new()));
     encode_trie_rec(trie.root)
-
-    // trie_vec.borrow_mut().reverse();
-    //
-    // let root = trie.root().unwrap();
-    //
-    // EncodedTrie {
-    //     root,
-    //     trie: Rc::try_unwrap(trie_vec).unwrap().into_inner(),
-    // }
 }
 
 fn encode_trie_rec(root: cita_trie::node::Node) -> Node {
@@ -90,52 +78,6 @@ fn encode_trie_rec(root: cita_trie::node::Node) -> Node {
         }
     }
 }
-
-// fn encode_trie_rec(root: Node, state: Rc<RefCell<Vec<Vec<usize>>>>) -> usize {
-//     match root {
-//         Node::Branch(branch) => {
-//             let borrow_branch = branch.borrow();
-//
-//             if borrow_branch.value.is_some() {
-//                 panic!("unexpected branch node with value");
-//             }
-//
-//             let mut children = Vec::new();
-//             for i in 0..16 {
-//                 let child = borrow_branch.children[i].clone();
-//
-//                 let child_idx = encode_trie_rec(child, state.clone());
-//                 children.push(child_idx);
-//             }
-//
-//             let mut state_inner = state.borrow_mut();
-//             state_inner.push(children);
-//             state_inner.len()
-//         }
-//         Node::Leaf(leaf) => {
-//             let borrow_leaf = leaf.borrow();
-//
-//             let mut stream = RlpStream::new_list(2);
-//             stream.append(&borrow_leaf.key.encode_compact());
-//             stream.append(&borrow_leaf.value);
-//
-//             let buf = stream.out().to_vec();
-//             let buf = buf
-//                 .iter()
-//                 .cloned()
-//                 .map(|e| e as usize)
-//                 .collect::<Vec<usize>>();
-//
-//             let mut state_inner = state.borrow_mut();
-//             state_inner.push(buf);
-//             state_inner.len()
-//         }
-//         Node::Empty => 0,
-//         _ => {
-//             panic!("unexpected node type");
-//         }
-//     }
-// }
 
 fn main() {
     let receipts_json = std::fs::read("receipts_full.json").unwrap();
