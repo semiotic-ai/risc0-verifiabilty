@@ -41,8 +41,6 @@ pub fn build_from_receipts(receipts: Vec<Receipt>) -> EncodedTrie {
     let trie_vec = Rc::new(RefCell::new(Vec::new()));
     encode_trie_rec(trie.root.clone(), trie_vec.clone());
 
-    trie_vec.borrow_mut().reverse();
-
     let root = trie.root().unwrap();
 
     EncodedTrie {
@@ -88,6 +86,7 @@ fn encode_trie_rec(root: Node, state: Rc<RefCell<Vec<Vec<usize>>>>) -> usize {
 
             let mut state_inner = state.borrow_mut();
             state_inner.push(buf);
+            // println!("leaf: {:?}", state_inner.len() - 1);
             state_inner.len()
         }
         Node::Empty => 0,
@@ -98,16 +97,17 @@ fn encode_trie_rec(root: Node, state: Rc<RefCell<Vec<Vec<usize>>>>) -> usize {
 }
 
 fn main() {
-    // First, we construct an executor environment
-    // let env = ExecutorEnv::builder().build().unwrap();
-
     let receipts_json = std::fs::read("receipts_full.json").unwrap();
     let receipts: Vec<Receipt> = serde_json::from_slice(receipts_json.as_slice()).unwrap();
 
     let time = std::time::Instant::now();
     let trie = build_from_receipts(receipts);
 
+    let root = trie.root.clone();
+
     let inputs = Inputs { trie };
+
+    println!("root: {:?}", root);
 
     let env = ExecutorEnv::builder()
         .add_input(&to_vec(&inputs).unwrap())

@@ -11,12 +11,9 @@ use trie_core::Inputs;
 
 const USIZE_SIZE: usize = size_of::<usize>();
 
-fn keccak256_tiny(bytes: &[u8]) -> [u8; 32] {
-    let mut digest = [0u8; 32];
-    let mut hasher = Keccak::v256();
+fn keccak256_tiny(mut hasher: Keccak, bytes: &[u8], output: &mut [u8; 32]) {
     hasher.update(bytes);
-    hasher.finalize(&mut digest);
-    digest
+    hasher.finalize(output);
 }
 
 pub const fn length_of_length(payload_length: usize) -> usize {
@@ -27,7 +24,8 @@ pub const fn length_of_length(payload_length: usize) -> usize {
     }
 }
 
-fn compute_root(trie: &Vec<Vec<usize>>, idx: usize) -> [u8; 32] {
+fn compute_root(trie: &Vec<Vec<usize>>, idx: usize, output: &mut [u8; 32]) {
+    let hasher = Keccak::v256();
     let node = &trie[idx];
     return if node.len() == 16 {
         let non_empty_children = node.iter().filter(|e| **e != 0).count();
@@ -36,9 +34,8 @@ fn compute_root(trie: &Vec<Vec<usize>>, idx: usize) -> [u8; 32] {
 
         let payload_len_bytes = payload_size.to_be_bytes();
         let payload_len_bytes = &payload_len_bytes[payload_len_bytes.len() - payload_len_len..];
-        //
-        // let mut vec = Vec::with_capacity(1 + payload_len_len + payload_size);
-        let mut vec = vec![0u8; 1 + payload_len_len + payload_size];
+
+        let mut vec = Vec::with_capacity(1 + payload_len_len + payload_size);
         vec.push(0xf7 + payload_len_len as u8);
         vec.extend_from_slice(payload_len_bytes);
 
@@ -47,22 +44,23 @@ fn compute_root(trie: &Vec<Vec<usize>>, idx: usize) -> [u8; 32] {
             if child_idx == 0 {
                 vec.push(0x80);
             } else if child_idx <= trie.len() {
-                let child_hash = compute_root(trie, child_idx);
+                compute_root(trie, child_idx - 1, output);
                 vec.push(160); // 128 + 32
-                vec.extend_from_slice(&child_hash);
+                vec.extend_from_slice(output);
             }
         }
 
         vec.push(0x80); // Empty data
-        keccak256_tiny(&vec)
+        keccak256_tiny(hasher, &vec, output);
     } else {
         let buf: Vec<u8> = node.iter().map(|e| *e as u8).collect();
-        keccak256_tiny(&buf)
+        keccak256_tiny(hasher, &buf, output);
     };
 }
 
 pub fn main() {
     let inputs: Inputs = env::read();
-    let root = compute_root(&inputs.trie.trie, 0);
-    env::commit(&root);
+    let mut output = [0u8; 32];
+    compute_root(&inputs.trie.trie, inputs.trie.trie.len() - 1, &mut output);
+    env::commit(&output);
 }
