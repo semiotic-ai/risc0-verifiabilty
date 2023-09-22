@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 // TODO: Update the name of the method loaded by the prover. E.g., if the method
 // is `multiply`, replace `METHOD_NAME_ELF` with `MULTIPLY_ELF` and replace
 // `METHOD_NAME_ID` with `MULTIPLY_ID`
@@ -17,7 +18,7 @@ use reth_primitives::rpc_utils::rlp::RlpStream;
 use reth_rlp::Encodable;
 use trie_core::{Inputs, Node};
 
-pub fn build_from_receipts(receipts: Vec<Receipt>) -> Node {
+pub fn build_from_receipts(receipts: Vec<Receipt>) -> (Vec<String>, Node) {
     let mem_db = Arc::new(MemoryDB::new(true));
     let hasher = Arc::new(HasherKeccak::new());
 
@@ -25,9 +26,26 @@ pub fn build_from_receipts(receipts: Vec<Receipt>) -> Node {
     let mut key_buf = BytesMut::new();
     let mut value_buf = BytesMut::new();
 
+    let mut log_addresses: Vec<String> = Vec::new();
+
+    let mut contract_prime = HashMap::new();
+    // contract_prime.insert("0x0d4a11d5EEaaC28EC3F61d100daF4d40471f1852", 2);
+    // contract_prime.insert("0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984", 3);
+    // contract_prime.insert("0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D", 5);
+    contract_prime.insert("0x4ce5df9033ead87976255a8695592bca3e8cb5cb", 2);
+    contract_prime.insert("0xf64e49c1d1d2b1cfa570b1da6481dc8dc95cd093", 3);
+    contract_prime.insert("0x076a3e1500f3110d8f4445d396a3d7ca6d0ca269", 5);
+
     for (idx, receipt) in receipts.iter().enumerate() {
         key_buf.clear();
         idx.encode(&mut key_buf);
+
+        receipt.logs.iter().for_each(|log| {
+            let addr = format!("{:?}", log.address);
+            log_addresses.push(addr);
+        });
+
+        // println!("leaves: {:?}", product_tree_leaves);
 
         value_buf.clear();
         let bloom_receipt = ReceiptWithBloomRef::from(receipt);
@@ -35,7 +53,14 @@ pub fn build_from_receipts(receipts: Vec<Receipt>) -> Node {
         trie.insert(key_buf.to_vec(), value_buf.to_vec()).unwrap();
     }
 
-    encode_trie_rec(trie.root)
+    // let leaves = map_leaves(product_tree_leaves);
+    // let product_tree = build_product_tree(leaves);
+    // println!("value: {}", product_tree.borrow().value());
+    //
+    // println!("collect: {:?}", product_tree.borrow().collect());
+    // println!("commit: {:?}", product_tree.borrow().commit());
+
+    (log_addresses, encode_trie_rec(trie.root))
 }
 
 fn encode_trie_rec(root: cita_trie::node::Node) -> Node {
@@ -84,9 +109,12 @@ fn main() {
     let receipts: Vec<Receipt> = serde_json::from_slice(receipts_json.as_slice()).unwrap();
 
     let time = std::time::Instant::now();
-    let root = build_from_receipts(receipts);
+    let (log_addresses, root) = build_from_receipts(receipts);
 
-    let inputs = Inputs { root };
+    let inputs = Inputs {
+        root,
+        log_addresses,
+    };
 
     println!("time: {:?}", time.elapsed());
 
