@@ -131,8 +131,12 @@ fn main() {
 
     println!("time: {:?}", time.elapsed());
     let hash: [u8; 32] = from_slice(&receipt.journal).expect("Error serializing journal output");
-
     println!("hash: {:?}", hash);
+
+    let product_tree_hash: [u8; 32] =
+        from_slice(&receipt.journal[32..]).expect("Error serializing output");
+    println!("product_tree_hash: {:?}", product_tree_hash);
+
     // Optional: Verify receipt to confirm that recipients will also be able to
     // verify your receipt
     receipt.verify(METHOD_NAME_ID).unwrap();

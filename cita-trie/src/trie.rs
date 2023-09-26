@@ -743,7 +743,7 @@ where
         //     return hash_node.borrow().hash.clone();
         // }
 
-        let data = self.encode_raw(n.clone());
+        let data = self.encode_raw(n);
         // Nodes smaller than 32 bytes are stored inside their parent,
         // Nodes equal to 32 bytes are returned directly
         if data.len() < H::LENGTH {
