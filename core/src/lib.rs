@@ -8,6 +8,13 @@ pub struct Inputs {
     pub log_addresses: Vec<String>,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct Outputs {
+    pub root: [u8; 32],
+    pub product_tree_hash: [u8; 32],
+    pub product_tree_root: [u8; 16], // 16 bytes for u128
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, Default)]
 pub enum Node {
     Branch {
@@ -94,4 +101,15 @@ pub fn build_product_tree(leaves: Vec<Rc<RefCell<BinaryTree>>>) -> Rc<RefCell<Bi
     }
 
     build_product_tree(branches)
+}
+
+pub fn factor_of_n(val: u128, n: u8) -> u8 {
+    let mut count = 0;
+    let mut val = val;
+    while val % n as u128 == 0 {
+        count += 1;
+        val /= n as u128;
+    }
+
+    count
 }

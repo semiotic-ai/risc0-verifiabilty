@@ -1,8 +1,4 @@
-use std::collections::HashMap;
-// TODO: Update the name of the method loaded by the prover. E.g., if the method
-// is `multiply`, replace `METHOD_NAME_ELF` with `MULTIPLY_ELF` and replace
-// `METHOD_NAME_ID` with `MULTIPLY_ID`
-use methods::{METHOD_NAME_ELF, METHOD_NAME_ID};
+use methods::{RECEIPTS_ROOT_AND_PRODUCT_TREE_ELF, RECEIPTS_ROOT_AND_PRODUCT_TREE_ID};
 use risc0_zkvm::{default_prover, serde::from_slice, ExecutorEnv};
 
 use hasher::HasherKeccak;
@@ -16,7 +12,7 @@ use cita_trie::{PatriciaTrie, Trie};
 use reth_primitives::bytes::BytesMut;
 use reth_primitives::rpc_utils::rlp::RlpStream;
 use reth_rlp::Encodable;
-use trie_core::{Inputs, Node};
+use trie_core::{factor_of_n, Inputs, Node, Outputs};
 
 pub fn build_from_receipts(receipts: Vec<Receipt>) -> (Vec<String>, Node) {
     let mem_db = Arc::new(MemoryDB::new(true));
@@ -28,21 +24,32 @@ pub fn build_from_receipts(receipts: Vec<Receipt>) -> (Vec<String>, Node) {
 
     let mut log_addresses: Vec<String> = Vec::new();
 
-    let mut contract_prime = HashMap::new();
+    // let mut contract_prime = HashMap::new();
     // contract_prime.insert("0x0d4a11d5EEaaC28EC3F61d100daF4d40471f1852", 2);
     // contract_prime.insert("0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984", 3);
     // contract_prime.insert("0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D", 5);
-    contract_prime.insert("0x4ce5df9033ead87976255a8695592bca3e8cb5cb", 2);
-    contract_prime.insert("0xf64e49c1d1d2b1cfa570b1da6481dc8dc95cd093", 3);
-    contract_prime.insert("0x076a3e1500f3110d8f4445d396a3d7ca6d0ca269", 5);
+    // contract_prime.insert("0x4ce5df9033ead87976255a8695592bca3e8cb5cb", 2);
+    // contract_prime.insert("0xf64e49c1d1d2b1cfa570b1da6481dc8dc95cd093", 3);
+    // contract_prime.insert("0x076a3e1500f3110d8f4445d396a3d7ca6d0ca269", 5);
 
     for (idx, receipt) in receipts.iter().enumerate() {
         key_buf.clear();
         idx.encode(&mut key_buf);
 
         receipt.logs.iter().for_each(|log| {
+            // if log.address
+            //     == Address::from_str("0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984").unwrap()
+            // {
+            //     println!("log: {:?} {:?}", log, log.address);
+            //     println!(
+            //         "{}",
+            //         format!("{:?}", log.address).to_lowercase()
+            //             == "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984"
+            //     );
+            // }
+
             let addr = format!("{:?}", log.address);
-            log_addresses.push(addr);
+            log_addresses.push(addr.to_lowercase());
         });
 
         // println!("leaves: {:?}", product_tree_leaves);
@@ -53,6 +60,12 @@ pub fn build_from_receipts(receipts: Vec<Receipt>) -> (Vec<String>, Node) {
         trie.insert(key_buf.to_vec(), value_buf.to_vec()).unwrap();
     }
 
+    // let mut product_tree_leaves = Vec::new();
+    // for addr in &log_addresses {
+    //     let prime = contract_prime.get(addr.as_str()).unwrap_or(&1);
+    //     product_tree_leaves.push(*prime);
+    // }
+    //
     // let leaves = map_leaves(product_tree_leaves);
     // let product_tree = build_product_tree(leaves);
     // println!("value: {}", product_tree.borrow().value());
@@ -116,28 +129,31 @@ fn main() {
         log_addresses,
     };
 
-    println!("time: {:?}", time.elapsed());
-
+    println!("Time building inputs: {:?}", time.elapsed());
     let env = ExecutorEnv::builder()
-        .add_input(&to_vec(&inputs).unwrap())
+        .add_input(&to_vec(&inputs).expect("Error serializing input"))
         .build()
-        .unwrap();
+        .expect("Error building environment");
 
     // Obtain the default prover.
     let prover = default_prover();
 
     // Produce a receipt by proving the specified ELF binary.
-    let receipt = prover.prove_elf(env, METHOD_NAME_ELF).unwrap();
+    let receipt = prover
+        .prove_elf(env, RECEIPTS_ROOT_AND_PRODUCT_TREE_ELF)
+        .expect("Error proving ELF");
+    // Verify receipt to confirm that recipients will also be able to verify your receipt
+    receipt
+        .verify(RECEIPTS_ROOT_AND_PRODUCT_TREE_ID)
+        .expect("Error verifying receipt");
 
-    println!("time: {:?}", time.elapsed());
-    let hash: [u8; 32] = from_slice(&receipt.journal).expect("Error serializing journal output");
-    println!("hash: {:?}", hash);
+    println!("Elapsed after proof: {:?}", time.elapsed());
 
-    let product_tree_hash: [u8; 32] =
-        from_slice(&receipt.journal[32..]).expect("Error serializing output");
-    println!("product_tree_hash: {:?}", product_tree_hash);
+    let outputs: Outputs = from_slice(&receipt.journal).expect("Error serializing output");
+    println!("Outputs: {:?}", outputs);
 
-    // Optional: Verify receipt to confirm that recipients will also be able to
-    // verify your receipt
-    receipt.verify(METHOD_NAME_ID).unwrap();
+    let product_tree_root = u128::from_be_bytes(outputs.product_tree_root);
+    println!("2: {}", factor_of_n(product_tree_root, 2));
+    println!("3: {}", factor_of_n(product_tree_root, 3));
+    println!("5: {}", factor_of_n(product_tree_root, 5));
 }
