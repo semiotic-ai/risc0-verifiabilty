@@ -63,6 +63,10 @@ impl BinaryTree {
     }
 }
 
+/**
+* Map a list of leaves (unsigned integers) to a list of binary tree leaves.
+* Fills the list with 1s if the number of leaves is not a power of 2.
+**/
 pub fn map_leaves(leaves: Vec<u128>) -> Vec<Rc<RefCell<BinaryTree>>> {
     let mut leaves: Vec<Rc<RefCell<BinaryTree>>> = leaves
         .iter()
@@ -80,7 +84,7 @@ pub fn map_leaves(leaves: Vec<u128>) -> Vec<Rc<RefCell<BinaryTree>>> {
 
 /**
  * Build a product tree from a list of leaves.
- * Leaves len must be a power of 2. Complete with 1s if not.
+ * Leaves len must be a power of 2. Complete with 1s if not (see map_leaves function).
  * The product tree is a binary tree where each node is the product of its children.
  **/
 pub fn build_product_tree(leaves: Vec<Rc<RefCell<BinaryTree>>>) -> Rc<RefCell<BinaryTree>> {
@@ -103,6 +107,11 @@ pub fn build_product_tree(leaves: Vec<Rc<RefCell<BinaryTree>>>) -> Rc<RefCell<Bi
     build_product_tree(branches)
 }
 
+/**
+ * Calculate the number of times a number is divisible by a given factor.
+ * This function allows you to query the product tree to determine
+ * how many times an events associated prime happened in a block, given the product tree root from the block.
+ **/
 pub fn factor_of_n(val: u128, n: u8) -> u8 {
     let mut count = 0;
     let mut val = val;

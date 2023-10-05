@@ -60,19 +60,6 @@ pub fn build_from_receipts(receipts: Vec<Receipt>) -> (Vec<String>, Node) {
         trie.insert(key_buf.to_vec(), value_buf.to_vec()).unwrap();
     }
 
-    // let mut product_tree_leaves = Vec::new();
-    // for addr in &log_addresses {
-    //     let prime = contract_prime.get(addr.as_str()).unwrap_or(&1);
-    //     product_tree_leaves.push(*prime);
-    // }
-    //
-    // let leaves = map_leaves(product_tree_leaves);
-    // let product_tree = build_product_tree(leaves);
-    // println!("value: {}", product_tree.borrow().value());
-    //
-    // println!("collect: {:?}", product_tree.borrow().collect());
-    // println!("commit: {:?}", product_tree.borrow().commit());
-
     (log_addresses, encode_trie_rec(trie.root))
 }
 
@@ -118,7 +105,7 @@ fn encode_trie_rec(root: cita_trie::node::Node) -> Node {
 }
 
 fn main() {
-    let receipts_json = std::fs::read("receipts_full.json").unwrap();
+    let receipts_json = std::fs::read("receipts.json").unwrap();
     let receipts: Vec<Receipt> = serde_json::from_slice(receipts_json.as_slice()).unwrap();
 
     let time = std::time::Instant::now();
